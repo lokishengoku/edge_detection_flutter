@@ -166,63 +166,77 @@ class ScanActivity : BaseActivity(), IScanView.Proxy {
 
     @RequiresApi(Build.VERSION_CODES.Q)
     fun onImageSelected(imageUri: Uri) {
-        Log.i(TAG, "Start onImageSelected")
+        try {
+            Log.i(TAG, "Start onImageSelected")
 
-        val iStream: InputStream = contentResolver.openInputStream(imageUri)!!
+            val iStream: InputStream = contentResolver.openInputStream(imageUri)!!
 
-        val exif = ExifInterface(iStream);
-        var rotation = -1
-        val orientation: Int = exif.getAttributeInt(
-                ExifInterface.TAG_ORIENTATION,
-                ExifInterface.ORIENTATION_UNDEFINED
-        )
-        Log.i(TAG, "orientation: $orientation")
+            val exif = ExifInterface(iStream);
+            var rotation = -1
+            val orientation: Int = exif.getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_UNDEFINED
+            )
+            Log.i(TAG, "orientation: $orientation")
 
-        when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> rotation = Core.ROTATE_90_CLOCKWISE
-            ExifInterface.ORIENTATION_ROTATE_180 -> rotation = Core.ROTATE_180
-            ExifInterface.ORIENTATION_ROTATE_270 -> rotation = Core.ROTATE_90_COUNTERCLOCKWISE
-        }
-        Log.i(TAG, "rotation:$rotation")
-
-        val mimeType = contentResolver.getType(imageUri)
-        Log.i(TAG, "mimeType:$mimeType")
-
-        var imageWidth = 0.0
-        var imageHeight = 0.0
-
-        if (mimeType?.startsWith("image/png") == true) {
-            val source = ImageDecoder.createSource(contentResolver, imageUri)
-            val drawable = ImageDecoder.decodeDrawable(source)
-
-            imageWidth = drawable.intrinsicWidth.toDouble()
-            imageHeight = drawable.intrinsicHeight.toDouble()
-
-            if (rotation == Core.ROTATE_90_CLOCKWISE || rotation == Core.ROTATE_90_COUNTERCLOCKWISE) {
-                imageWidth = drawable.intrinsicHeight.toDouble()
-                imageHeight = drawable.intrinsicWidth.toDouble()
+            when (orientation) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> rotation = Core.ROTATE_90_CLOCKWISE
+                ExifInterface.ORIENTATION_ROTATE_180 -> rotation = Core.ROTATE_180
+                ExifInterface.ORIENTATION_ROTATE_270 -> rotation = Core.ROTATE_90_COUNTERCLOCKWISE
             }
-        } else {
-            imageWidth = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).toDouble()
-            imageHeight = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).toDouble()
-            if (rotation == Core.ROTATE_90_CLOCKWISE || rotation == Core.ROTATE_90_COUNTERCLOCKWISE) {
-                imageWidth = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).toDouble()
-                imageHeight = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).toDouble()
+            Log.i(TAG, "rotation:$rotation")
+
+            val mimeType = contentResolver.getType(imageUri)
+            Log.i(TAG, "mimeType:$mimeType")
+
+            var imageWidth = 0.0
+            var imageHeight = 0.0
+
+            if (mimeType?.startsWith("image/png") == true) {
+//                val source = ImageDecoder.createSource(contentResolver, imageUri)
+//                val drawable = ImageDecoder.decodeDrawable(source)
+//
+//                imageWidth = drawable.intrinsicWidth.toDouble()
+//                imageHeight = drawable.intrinsicHeight.toDouble()
+//
+//                if (rotation == Core.ROTATE_90_CLOCKWISE || rotation == Core.ROTATE_90_COUNTERCLOCKWISE) {
+//                    imageWidth = drawable.intrinsicHeight.toDouble()
+//                    imageHeight = drawable.intrinsicWidth.toDouble()
+//                }
+                imageWidth = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).toDouble()
+                imageHeight = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).toDouble()
+                if (rotation == Core.ROTATE_90_CLOCKWISE || rotation == Core.ROTATE_90_COUNTERCLOCKWISE) {
+                    imageWidth = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).toDouble()
+                    imageHeight = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).toDouble()
+                }
+            } else {
+                imageWidth = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).toDouble()
+                imageHeight = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).toDouble()
+                if (rotation == Core.ROTATE_90_CLOCKWISE || rotation == Core.ROTATE_90_COUNTERCLOCKWISE) {
+                    imageWidth = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).toDouble()
+                    imageHeight = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).toDouble()
+                }
             }
+
+
+            Log.i(TAG, "width: $imageWidth")
+            Log.i(TAG, "height:$imageHeight")
+
+            val inputData: ByteArray? = getBytes(contentResolver.openInputStream(imageUri)!!)
+            val mat = Mat(Size(imageWidth, imageHeight), CvType.CV_8U)
+            mat.put(0, 0, inputData)
+            val pic = Imgcodecs.imdecode(mat, Imgcodecs.CV_LOAD_IMAGE_UNCHANGED)
+            if (rotation > -1) Core.rotate(pic, pic, rotation)
+            mat.release()
+
+            mPresenter.detectEdge(pic);
+        } catch (error: Exception) {
+            val intent = Intent()
+            intent.putExtra("RESULT", error.toString())
+            setResult(400, intent)
+            finish()
         }
 
-
-        Log.i(TAG, "width: $imageWidth")
-        Log.i(TAG, "height:$imageHeight")
-
-        val inputData: ByteArray? = getBytes(contentResolver.openInputStream(imageUri)!!)
-        val mat = Mat(Size(imageWidth, imageHeight), CvType.CV_8U)
-        mat.put(0, 0, inputData)
-        val pic = Imgcodecs.imdecode(mat, Imgcodecs.CV_LOAD_IMAGE_UNCHANGED)
-        if (rotation > -1) Core.rotate(pic, pic, rotation)
-        mat.release()
-
-        mPresenter.detectEdge(pic);
     }
 
     @Throws(IOException::class)
