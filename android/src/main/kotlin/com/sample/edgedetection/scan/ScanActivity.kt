@@ -168,14 +168,21 @@ class ScanActivity : BaseActivity(), IScanView.Proxy {
 
     @RequiresApi(Build.VERSION_CODES.N)
     fun onImageSelected(imageUri: Uri) {
+        Log.i(TAG, "Start onImageSelected")
+
         val iStream: InputStream = contentResolver.openInputStream(imageUri)!!
 
+        Log.i(TAG, "Input stream created")
+
         val exif = ExifInterface(iStream);
+        Log.i(TAG, "ExifInterface created")
         var rotation = -1
         val orientation: Int = exif.getAttributeInt(
             ExifInterface.TAG_ORIENTATION,
             ExifInterface.ORIENTATION_UNDEFINED
         )
+        Log.i(TAG, "Exif attributeInt extracted")
+
         when (orientation) {
             ExifInterface.ORIENTATION_ROTATE_90 -> rotation = Core.ROTATE_90_CLOCKWISE
             ExifInterface.ORIENTATION_ROTATE_180 -> rotation = Core.ROTATE_180
@@ -193,13 +200,19 @@ class ScanActivity : BaseActivity(), IScanView.Proxy {
         Log.i(TAG, "height:" + imageHeight)
 
         val inputData: ByteArray? = getBytes(contentResolver.openInputStream(imageUri)!!)
+        Log.i(TAG, "get bytes");
         val mat = Mat(Size(imageWidth, imageHeight), CvType.CV_8U)
+        Log.i(TAG, "create mat");
         mat.put(0, 0, inputData)
+        Log.i(TAG, "put mat data");
         val pic = Imgcodecs.imdecode(mat, Imgcodecs.CV_LOAD_IMAGE_UNCHANGED)
+        Log.i(TAG, "imdecode");
         if (rotation > -1) Core.rotate(pic, pic, rotation)
         mat.release()
+        Log.i(TAG, "mat release");
 
         mPresenter.detectEdge(pic);
+        Log.i(TAG, "End onImageSelected")
     }
 
     @Throws(IOException::class)
