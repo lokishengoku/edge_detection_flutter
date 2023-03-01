@@ -3,15 +3,15 @@ package com.sample.edgedetection.scan
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import androidx.exifinterface.media.ExifInterface
+import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.MediaStore
 import android.util.Log
 import android.view.*
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
+import androidx.exifinterface.media.ExifInterface
 import com.sample.edgedetection.EdgeDetectionHandler
 import com.sample.edgedetection.R
 import com.sample.edgedetection.REQUEST_CODE
@@ -24,9 +24,7 @@ import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.Size
 import org.opencv.imgcodecs.Imgcodecs
-import java.io.ByteArrayOutputStream
-import java.io.IOException
-import java.io.InputStream
+import java.io.*
 
 class ScanActivity : BaseActivity(), IScanView.Proxy {
 
@@ -52,35 +50,35 @@ class ScanActivity : BaseActivity(), IScanView.Proxy {
         }
 
         flash.visibility =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-                // to hidde the flashLight button from  SDK versions which we do not handle the permission for!
-                Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q &&
-                //
-                baseContext.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)
-            ) View.VISIBLE else View.GONE;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                        // to hidde the flashLight button from  SDK versions which we do not handle the permission for!
+                        Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q &&
+                        //
+                        baseContext.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)
+                ) View.VISIBLE else View.GONE;
         flash.setOnClickListener {
             mPresenter.toggleFlash();
         }
 
         val initialBundle = intent.getBundleExtra(EdgeDetectionHandler.INITIAL_BUNDLE) as Bundle;
         // NullPointerException here in case directly FROM_GALLERY
-        if(! initialBundle.containsKey(EdgeDetectionHandler.FROM_GALLERY)){
+        if (!initialBundle.containsKey(EdgeDetectionHandler.FROM_GALLERY)) {
             this.title = initialBundle.getString(EdgeDetectionHandler.SCAN_TITLE) as String
         }
         //
         gallery.visibility =
-            if (initialBundle.getBoolean(EdgeDetectionHandler.CAN_USE_GALLERY, true))
-                View.VISIBLE
-            else View.GONE;
+                if (initialBundle.getBoolean(EdgeDetectionHandler.CAN_USE_GALLERY, true))
+                    View.VISIBLE
+                else View.GONE;
 
         gallery.setOnClickListener {
             pickupFromGallery()
         };
 
         if (initialBundle.containsKey(EdgeDetectionHandler.FROM_GALLERY) && initialBundle.getBoolean(
-                EdgeDetectionHandler.FROM_GALLERY,
-                false
-            )
+                        EdgeDetectionHandler.FROM_GALLERY,
+                        false
+                )
         ) {
             pickupFromGallery()
         }
@@ -89,9 +87,9 @@ class ScanActivity : BaseActivity(), IScanView.Proxy {
     fun pickupFromGallery() {
         mPresenter.stop()
         val gallery = Intent(
-            Intent.ACTION_PICK,
-            android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI).apply{
-            type="image/*"
+                Intent.ACTION_PICK,
+                android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI).apply {
+            type = "image/*"
         }
         ActivityCompat.startActivityForResult(this, gallery, 1, null);
     }
@@ -132,8 +130,8 @@ class ScanActivity : BaseActivity(), IScanView.Proxy {
                 finish()
             } else {
                 if (intent.hasExtra(EdgeDetectionHandler.FROM_GALLERY) && intent.getBooleanExtra(
-                        EdgeDetectionHandler.FROM_GALLERY, false
-                    )
+                                EdgeDetectionHandler.FROM_GALLERY, false
+                        )
                 )
                     finish()
             }
@@ -142,14 +140,14 @@ class ScanActivity : BaseActivity(), IScanView.Proxy {
         if (requestCode == 1) {
             if (resultCode == Activity.RESULT_OK) {
                 val uri: Uri = data!!.data!!
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     onImageSelected(uri)
                 }
             } else {
                 if (intent.hasExtra(EdgeDetectionHandler.FROM_GALLERY) && intent.getBooleanExtra(
-                        EdgeDetectionHandler.FROM_GALLERY,
-                        false
-                    )
+                                EdgeDetectionHandler.FROM_GALLERY,
+                                false
+                        )
                 )
                     finish()
             }
@@ -166,53 +164,65 @@ class ScanActivity : BaseActivity(), IScanView.Proxy {
         return super.onOptionsItemSelected(item)
     }
 
-    @RequiresApi(Build.VERSION_CODES.N)
+    @RequiresApi(Build.VERSION_CODES.Q)
     fun onImageSelected(imageUri: Uri) {
         Log.i(TAG, "Start onImageSelected")
 
         val iStream: InputStream = contentResolver.openInputStream(imageUri)!!
 
-        Log.i(TAG, "Input stream created")
-
         val exif = ExifInterface(iStream);
-        Log.i(TAG, "ExifInterface created")
         var rotation = -1
         val orientation: Int = exif.getAttributeInt(
-            ExifInterface.TAG_ORIENTATION,
-            ExifInterface.ORIENTATION_UNDEFINED
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_UNDEFINED
         )
-        Log.i(TAG, "Exif attributeInt extracted")
+        Log.i(TAG, "orientation: $orientation")
 
         when (orientation) {
             ExifInterface.ORIENTATION_ROTATE_90 -> rotation = Core.ROTATE_90_CLOCKWISE
             ExifInterface.ORIENTATION_ROTATE_180 -> rotation = Core.ROTATE_180
             ExifInterface.ORIENTATION_ROTATE_270 -> rotation = Core.ROTATE_90_COUNTERCLOCKWISE
         }
-        Log.i(TAG, "rotation:" + rotation)
+        Log.i(TAG, "rotation:$rotation")
 
-        var imageWidth = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).toDouble()
-        var imageHeight = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).toDouble()
-        if (rotation == Core.ROTATE_90_CLOCKWISE || rotation == Core.ROTATE_90_COUNTERCLOCKWISE) {
-            imageWidth = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).toDouble()
-            imageHeight = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).toDouble()
+        val mimeType = contentResolver.getType(imageUri)
+        Log.i(TAG, "mimeType:$mimeType")
+
+        var imageWidth = 0.0
+        var imageHeight = 0.0
+
+        if (mimeType?.startsWith("image/png") == true) {
+            val source = ImageDecoder.createSource(contentResolver, imageUri)
+            val drawable = ImageDecoder.decodeDrawable(source)
+
+            imageWidth = drawable.intrinsicWidth.toDouble()
+            imageHeight = drawable.intrinsicHeight.toDouble()
+
+            if (rotation == Core.ROTATE_90_CLOCKWISE || rotation == Core.ROTATE_90_COUNTERCLOCKWISE) {
+                imageWidth = drawable.intrinsicHeight.toDouble()
+                imageHeight = drawable.intrinsicWidth.toDouble()
+            }
+        } else {
+            imageWidth = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).toDouble()
+            imageHeight = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).toDouble()
+            if (rotation == Core.ROTATE_90_CLOCKWISE || rotation == Core.ROTATE_90_COUNTERCLOCKWISE) {
+                imageWidth = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).toDouble()
+                imageHeight = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).toDouble()
+            }
         }
-        Log.i(TAG, "width:" + imageWidth)
-        Log.i(TAG, "height:" + imageHeight)
+
+
+        Log.i(TAG, "width: $imageWidth")
+        Log.i(TAG, "height:$imageHeight")
 
         val inputData: ByteArray? = getBytes(contentResolver.openInputStream(imageUri)!!)
-        Log.i(TAG, "get bytes");
         val mat = Mat(Size(imageWidth, imageHeight), CvType.CV_8U)
-        Log.i(TAG, "create mat");
         mat.put(0, 0, inputData)
-        Log.i(TAG, "put mat data");
         val pic = Imgcodecs.imdecode(mat, Imgcodecs.CV_LOAD_IMAGE_UNCHANGED)
-        Log.i(TAG, "imdecode");
         if (rotation > -1) Core.rotate(pic, pic, rotation)
         mat.release()
-        Log.i(TAG, "mat release");
 
         mPresenter.detectEdge(pic);
-        Log.i(TAG, "End onImageSelected")
     }
 
     @Throws(IOException::class)
