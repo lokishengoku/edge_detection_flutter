@@ -193,21 +193,15 @@ class ScanActivity : BaseActivity(), IScanView.Proxy {
             var imageHeight = 0.0
 
             if (mimeType?.startsWith("image/png") == true) {
-//                val source = ImageDecoder.createSource(contentResolver, imageUri)
-//                val drawable = ImageDecoder.decodeDrawable(source)
-//
-//                imageWidth = drawable.intrinsicWidth.toDouble()
-//                imageHeight = drawable.intrinsicHeight.toDouble()
-//
-//                if (rotation == Core.ROTATE_90_CLOCKWISE || rotation == Core.ROTATE_90_COUNTERCLOCKWISE) {
-//                    imageWidth = drawable.intrinsicHeight.toDouble()
-//                    imageHeight = drawable.intrinsicWidth.toDouble()
-//                }
-                imageWidth = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).toDouble()
-                imageHeight = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).toDouble()
+                val source = ImageDecoder.createSource(contentResolver, imageUri)
+                val drawable = ImageDecoder.decodeDrawable(source)
+
+                imageWidth = drawable.intrinsicWidth.toDouble()
+                imageHeight = drawable.intrinsicHeight.toDouble()
+
                 if (rotation == Core.ROTATE_90_CLOCKWISE || rotation == Core.ROTATE_90_COUNTERCLOCKWISE) {
-                    imageWidth = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).toDouble()
-                    imageHeight = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).toDouble()
+                    imageWidth = drawable.intrinsicHeight.toDouble()
+                    imageHeight = drawable.intrinsicWidth.toDouble()
                 }
             } else {
                 imageWidth = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).toDouble()
